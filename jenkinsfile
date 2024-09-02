@@ -1,0 +1,101 @@
+pipeline {
+    agent any
+
+    tools {
+        // Define Maven version if needed
+        maven 'local_mvn'
+    }
+
+    stages {
+        stage('Build') {
+            steps {
+                // Checkout code
+                git 'https://github.com/rupamkumar88/maven-web-app.git'
+
+                // Run Maven build
+                sh 'mvn clean install'
+            }
+        }
+
+        stage('Publish to Artifactory') {
+            when {
+                expression {
+                    // Only execute if previous stages succeeded
+                    currentBuild.result == null || currentBuild.result == 'SUCCESS'
+                }
+            }
+            steps {
+                script {
+                    echo 'Publishing to Artifactory...'
+
+                    def server = Artifactory.newServer(
+                        url: 'https://cleeroy.jfrog.io/artifactory',
+                        credentialsId: 'jfrog-credentials'
+                    )
+                    def uploadSpec = """{
+                        "files": [
+                            {
+                                "pattern": "target/*.war",
+                                "target": "cleeroy",
+                                "flat": "false"
+                            }
+                        ]
+                    }"""
+                    server.upload(uploadSpec)
+                }
+            }
+        }
+    }
+}
+
+
+
+// def registry = 'https://cleeroy.jfrog.io'
+
+// pipeline {
+//     agent any
+
+//     tools {
+//         maven "local_mvn"
+//     }
+
+//     stages {
+//         stage('Build') {
+//             steps {
+//                 git 'https://github.com/rupamkumar88/maven-web-app.git'
+//                 // sh "mvn -Dmaven.test.failure.ignore=true clean install"
+//                 sh "mvn -Dmaven.test.failure.ignore=true mvn clean install"
+//             }
+//         }
+
+//         stage('Publish to Artifactory') {
+//             steps {
+//                 script {
+//                     echo '<--------------- Publishing Started --------------->'
+//                     def server = Artifactory.newServer url: "${registry}/artifactory", credentialsId: "jfrog-credentials"
+//                     def properties = "buildid=${env.BUILD_ID},commitid=${env.GIT_COMMIT}"
+//                     def uploadSpec = """{
+//                         "files": [
+//                             {
+//                               "pattern": "target/01-maven-web-app.war",
+//                               "target": "cleeroy/{1}",
+//                               "flat": "false",
+//                               "props" : "${properties}",
+//                               "exclusions": [ "*.sha1", "*.md5"]
+//                             }
+//                         ]
+//                     }"""
+
+//                     try {
+//                         def buildInfo = server.upload(uploadSpec)
+//                         server.publishBuildInfo(buildInfo)
+//                         echo '<--------------- Publishing Ended --------------->'
+//                     } catch (Exception e) {
+//                         echo "Failed to upload file: ${e.message}"
+//                         throw e
+//                     }
+//                 }
+//             }
+//         }
+//     }
+// }
